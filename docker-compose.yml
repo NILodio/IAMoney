@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Production service
+  chatbot:
+    build:
+      context: .
+      target: production
+    ports:
+      - "8080:8080"
+    environment:
+      # Required environment variables
+      - API_KEY=${API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Optional variables
+      - DEVICE=${DEVICE}
+      - NGROK_TOKEN=${NGROK_TOKEN}
+      - NGROK_PATH=${NGROK_PATH}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service with hot reloading
+  chatbot-dev:
+    build:
+      context: .
+      target: development
+    ports:
+      - "8080:8080"
+    environment:
+      - API_KEY=${API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - PORT=8080
+      - LOG_LEVEL=debug
+      - ENVIRONMENT=development
+      - DEVICE=${DEVICE}
+      - NGROK_TOKEN=${NGROK_TOKEN}
+      - NGROK_PATH=${NGROK_PATH}
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for hot reloading
+      - ./src:/app/src:ro
+      - ./run.py:/app/run.py:ro
+    restart: unless-stopped
+    profiles:
+      - development
+
+networks:
+  default:
+    driver: bridge

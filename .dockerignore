@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.venv/
+.pytest_cache/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+DEVELOPMENT.md
+LICENSE
+
+# Tests
+tests/
+test_*
+
+# Logs
+logs/
+*.log
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
