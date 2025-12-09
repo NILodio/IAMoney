@@ -106,7 +106,8 @@ class TelegramClient:
                     text=message,
                 )
             
-            app_logger.debug(f'Message sent successfully via Telegram: {result.message_id}')
+            app_logger.info(f'✅ Message sent successfully via Telegram - Chat ID: {chat_id}, Message ID: {result.message_id}')
+            app_logger.debug(f'✅ Message content: {message[:100]}')
             return {
                 'id': str(result.message_id),
                 'chat_id': str(result.chat.id),

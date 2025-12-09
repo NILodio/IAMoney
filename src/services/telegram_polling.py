@@ -10,13 +10,21 @@ Usage:
     polling_service = TelegramPollingService(bot)
     await polling_service.start_polling()
 """
-import asyncio
+import asyncio``
 import logging
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from telegram.ext.filters import Document
 from src.bot.chatbot import ChatBot
-import os
+
+# Configure logging to respect LOG_LEVEL environment variable
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='[%(asctime)s] %(name)s.%(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 
 class TelegramPollingService:
@@ -43,6 +51,10 @@ class TelegramPollingService:
             # Transform to internal format
             chat = update.message.chat
             from_user = update.message.from_user
+            
+            # Log incoming message
+            message_text = update.message.text or '[Media/Non-text message]'
+            logging.info(f'📥 INCOMING MESSAGE - Chat ID: {chat.id}, User: {from_user.first_name} (@{from_user.username or "N/A"}), Message: {message_text[:100]}')
             
             data = {
                 'event': 'message:in:new',

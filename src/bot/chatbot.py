@@ -10,6 +10,14 @@ from src.bot.function_handler import FunctionHandler
 from src.config.bot_config import BotConfig
 from src.storage import memory_store
 
+# Configure logging to respect LOG_LEVEL environment variable
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='[%(asctime)s] %(name)s.%(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 class ChatBot:
     def __init__(self):
         self.config = BotConfig.get_all()
@@ -117,7 +125,8 @@ class ChatBot:
                 current_count = 0
             memory_store.set(message_count_key, current_count + 1)
             body = await self.extract_message_body(data)
-            logging.info(f'Processing inbound message: chatId={chat_id}, type={data.get("type")}, bodyLength={len(body)}')
+            logging.info(f'📥 Processing inbound message: chatId={chat_id}, type={data.get("type")}, bodyLength={len(body)}')
+            logging.debug(f'📥 Full message body: {body[:200]}')  # Log first 200 chars
             await self.telegram_client.send_typing_state(data, device)
             if re.match(r'^(human|person|help|stop)$', body.strip(), re.I):
                 await self.assign_chat_to_agent(data, device)
@@ -200,6 +209,8 @@ class ChatBot:
             response = await self.generate_response_with_functions(messages, tools, data, device)
             if not response:
                 response = self.config['unknownCommandMessage']
+            logging.info(f'📤 OUTGOING MESSAGE - Chat ID: {chat_id}, Response length: {len(response)}')
+            logging.debug(f'📤 Full response: {response[:200]}')  # Log first 200 chars
             self.store_message(chat_id, 'assistant', response)
             await self.send_response(data, device, response, use_audio)
             await self.update_chat_metadata(data, device)
