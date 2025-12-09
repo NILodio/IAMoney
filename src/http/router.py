@@ -12,7 +12,7 @@ bot = ChatBot()
 async def index():
     return {
         'name': 'chatbot',
-        'description': 'WhatsApp ChatGPT powered chatbot for Wassenger',
+        'description': 'Telegram ChatGPT powered chatbot',
         'version': '1.0.0',
         'endpoints': {
             'webhook': {'path': '/webhook', 'method': 'POST'},
@@ -33,23 +33,62 @@ async def process_message_async(body):
 
 async def load_device():
     try:
-        return await bot.get_wassenger_client().load_device()
+        return await bot.get_telegram_client().load_device()
     except Exception as e:
         logging.error(f'Failed to load device: {e}')
         return None
 
 @router.post('/webhook')
 async def webhook(request: Request, background_tasks: BackgroundTasks):
+    """Handle Telegram webhook updates."""
     try:
         body = await request.json()
-        if not body or 'event' not in body or 'data' not in body:
-            logging.warning(f'Invalid webhook payload: {body}')
-            return JSONResponse({'message': 'Invalid payload body'}, status_code=400)
-        if body['event'] != 'message:in:new':
-            logging.debug(f'Ignoring webhook event: {body["event"]}')
-            return JSONResponse({'message': 'Ignore webhook event: only message:in:new is accepted'}, status_code=202)
-        # Process message in background
-        background_tasks.add_task(process_message_async, body)
+        
+        # Telegram webhook format
+        if 'message' in body:
+            message = body['message']
+            chat = message.get('chat', {})
+            from_user = message.get('from', {})
+            
+            # Transform Telegram format to internal format
+            transformed_data = {
+                'event': 'message:in:new',
+                'data': {
+                    'chat': {
+                        'id': str(chat.get('id', '')),
+                        'fromNumber': str(from_user.get('id', '')),
+                        'type': 'chat',
+                    },
+                    'fromNumber': str(from_user.get('id', '')),
+                    'chat_id': str(chat.get('id', '')),
+                    'body': message.get('text', ''),
+                    'type': 'text',
+                    'message_id': message.get('message_id'),
+                }
+            }
+            
+            # Handle different message types
+            if message.get('voice'):
+                transformed_data['data']['type'] = 'voice'
+                transformed_data['data']['media'] = {'id': message['voice']['file_id']}
+            elif message.get('audio'):
+                transformed_data['data']['type'] = 'audio'
+                transformed_data['data']['media'] = {'id': message['audio']['file_id']}
+            elif message.get('photo'):
+                transformed_data['data']['type'] = 'photo'
+                transformed_data['data']['media'] = {'id': message['photo'][-1]['file_id']}
+            elif message.get('video'):
+                transformed_data['data']['type'] = 'video'
+                transformed_data['data']['media'] = {'id': message['video']['file_id']}
+            elif message.get('document'):
+                transformed_data['data']['type'] = 'document'
+                transformed_data['data']['media'] = {'id': message['document']['file_id']}
+            
+            # Process message in background
+            background_tasks.add_task(process_message_async, transformed_data)
+            return JSONResponse({'ok': True})
+        
+        # Handle other Telegram update types (ignored)
         return JSONResponse({'ok': True})
     except Exception as e:
         logging.error(f'Webhook processing failed: {e}')
@@ -59,9 +98,13 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
 async def send_message(request: Request):
     try:
         body = await request.json()
-        if not body or 'phone' not in body or 'message' not in body:
-            return JSONResponse({'message': 'Invalid payload body'}, status_code=400)
-        result = await bot.get_wassenger_client().send_message(body)
+        # Support both 'chat_id' and 'phone' for compatibility
+        if not body or ('chat_id' not in body and 'phone' not in body) or 'message' not in body:
+            return JSONResponse({'message': 'Invalid payload body. Required: chat_id (or phone) and message'}, status_code=400)
+        # Convert 'phone' to 'chat_id' if needed
+        if 'phone' in body and 'chat_id' not in body:
+            body['chat_id'] = body['phone']
+        result = await bot.get_telegram_client().send_message(body)
         if result:
             return JSONResponse(result)
         else:
@@ -73,17 +116,23 @@ async def send_message(request: Request):
 @router.get('/sample')
 async def sample(request: Request):
     try:
-        phone = request.query_params.get('phone')
-        message = request.query_params.get('message', 'Hello World from Wassenger!')
+        chat_id = request.query_params.get('chat_id') or request.query_params.get('phone')
+        message = request.query_params.get('message', 'Hello World from Telegram Bot!')
         device = await load_device()
         if not device:
-            return JSONResponse({'message': 'No active device found'}, status_code=500)
+            return JSONResponse({'message': 'Bot not initialized'}, status_code=500)
+        # Note: For Telegram, you need to provide a chat_id to send a message
+        # This endpoint is mainly for testing with webhook
+        if not chat_id:
+            return JSONResponse({
+                'message': 'chat_id parameter required. Get it from a Telegram message.',
+                'bot_info': device.get('bot_info', {})
+            }, status_code=400)
         data = {
-            'phone': phone or device.get('phone'),
+            'chat_id': chat_id,
             'message': message,
-            'device': device.get('id'),
         }
-        result = await bot.get_wassenger_client().send_message(data)
+        result = await bot.get_telegram_client().send_message(data)
         if result:
             return JSONResponse(result)
         else:

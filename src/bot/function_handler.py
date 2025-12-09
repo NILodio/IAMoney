@@ -37,7 +37,7 @@ class FunctionHandler:
         return {
             'getPlanPrices': {
                 'name': 'getPlanPrices',
-                'description': 'Get available plans and prices information available in Wassenger',
+                'description': 'Get available plans and prices information',
                 'parameters': {'type': 'object', 'properties': {}},
                 'run': self.get_plan_prices,
             },
@@ -88,16 +88,13 @@ class FunctionHandler:
         }
 
     def get_plan_prices(self, parameters, context):
-        return """*Send & Receive messages + API + Webhooks + Team Chat + Campaigns + CRM + Analytics*
+        return """*Service Plans and Pricing*
 
-- Platform Professional: 30,000 messages + unlimited inbound messages + 10 campaigns / month
-- Platform Business: 60,000 messages + unlimited inbound messages + 20 campaigns / month
-- Platform Enterprise: unlimited messages + 30 campaigns
+- Basic Plan: Includes core messaging features
+- Professional Plan: Advanced features and higher limits
+- Enterprise Plan: Unlimited features and priority support
 
-Each plan is limited to one WhatsApp number. You can purchase multiple plans if you have multiple numbers.
-
-*Find more information about the different plan prices and features here:*
-https://wassenger.com/#pricing"""
+Please contact us for detailed pricing information."""
 
     def load_user_information(self, parameters, context):
         return 'I am sorry, I am not able to access the CRM at the moment. Please try again later.'

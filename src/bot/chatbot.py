@@ -5,7 +5,7 @@ import logging
 import tempfile
 import datetime
 from src.api.openai_client import OpenAIClient
-from src.api.wassenger_client import WassengerClient
+from src.api.telegram_client import TelegramClient
 from src.bot.function_handler import FunctionHandler
 from src.config.bot_config import BotConfig
 from src.storage import memory_store
@@ -15,44 +15,22 @@ class ChatBot:
         self.config = BotConfig.get_all()
         api_config = self.config['api']
         self.openai_client = OpenAIClient(api_config['openaiKey'], api_config['openaiModel'])
-        self.wassenger_client = WassengerClient(api_config['apiKey'], api_config['apiBaseUrl'])
+        self.telegram_client = TelegramClient(api_config['telegramBotToken'])
         self.function_handler = FunctionHandler()
         # Optionally set up cache TTL
         # memory_store.cache.ttl = self.config.get('cacheTTL', 3600)
 
     def can_reply(self, data, device):
-        chat = data['chat']
-        if chat.get('owner', {}).get('agent'):
-            logging.debug(f"Skipping chat assigned to agent: {chat['id']}")
+        """Check if bot can reply to this message. Simplified for Telegram."""
+        # Telegram bots can always reply (no agent assignment, labels, etc.)
+        # Only check basic message validity
+        chat = data.get('chat', {})
+        if not chat or not chat.get('id'):
+            logging.debug("Invalid chat data")
             return False
-        if chat.get('fromNumber') == device.get('phone'):
-            logging.debug('Skipping message from same device number')
-            return False
-        if chat.get('type') != 'chat':
-            logging.debug(f"Skipping non-chat message: {chat.get('type')}")
-            return False
-        labels = chat.get('labels') or []
-        if self.config['skipChatWithLabels'] and labels:
-            if set(labels) & set(self.config['skipChatWithLabels']):
-                logging.debug(f"Skipping chat with blacklisted labels: {labels}")
-                return False
-        from_number = chat.get('fromNumber') or ''
-        if self.config['numbersWhitelist'] and from_number:
-            if from_number not in self.config['numbersWhitelist']:
-                logging.debug(f"Skipping non-whitelisted number: {from_number}")
-                return False
-        if self.config['numbersBlacklist'] and from_number:
-            if from_number in self.config['numbersBlacklist']:
-                logging.debug(f"Skipping blacklisted number: {from_number}")
-                return False
-        if chat.get('status') in ['banned'] or chat.get('waStatus') in ['banned']:
-            logging.debug('Skipping banned chat')
-            return False
-        if chat.get('contact', {}).get('status') == 'blocked':
-            logging.debug('Skipping blocked contact')
-            return False
-        if self.config['skipArchivedChats'] and (chat.get('status') in ['archived'] or chat.get('waStatus') in ['archived']):
-            logging.debug('Skipping archived chat')
+        # Check if message has content
+        if not data.get('body') and not data.get('type'):
+            logging.debug("Message has no content")
             return False
         return True
 
@@ -65,45 +43,36 @@ class ChatBot:
 
     def has_chat_messages_quota(self, chat):
         limits = self.config['limits']
-        return memory_store.get(chat['id'], 0) < limits['maxMessagesPerChat']
+        chat_id = chat['id']
+        # Use a separate key for message count to avoid conflict with conversation history
+        message_count_key = f"msg_count_{chat_id}"
+        message_count = memory_store.get(message_count_key, 0)
+        # Ensure it's an integer (in case it was stored as something else)
+        if not isinstance(message_count, int):
+            message_count = 0
+        return message_count < limits['maxMessagesPerChat']
 
     async def update_chat_on_messages_quota(self, data, device):
+        """Handle message quota exceeded. Simplified for Telegram."""
         chat = data['chat']
-        if self.has_chat_metadata_quota_exceeded(chat):
-            return
-        try:
-            await self.assign_chat_to_agent(data, device, force=True)
-            await self.wassenger_client.update_chat_metadata(data, device, [
-                {'key': 'bot:chatgpt:status', 'value': 'too_many_messages'}
-            ])
-        except Exception as e:
-            logging.error(f'Failed to update chat on quota exceeded: {e}')
+        chat_id = chat['id']
+        logging.info(f'Chat quota exceeded: {chat_id}')
+        # Send a message informing user about quota
+        await self.send_message({
+            'chat_id': chat_id,
+            'message': 'You have reached the maximum number of messages. Please try again later.',
+        })
 
     async def assign_chat_to_agent(self, data, device, force=False):
-        if not self.config['enableMemberChatAssignment'] and not force:
-            return
-        try:
-            members = await self.wassenger_client.pull_members(device)
-            eligible_members = self.filter_eligible_members(members)
-            if not eligible_members:
-                logging.warning('No eligible members available for assignment')
-                return
-            import random
-            selected_member = random.choice(eligible_members)
-            await self.wassenger_client.assign_chat_to_agent(data, device, selected_member['id'])
-            if self.config['setMetadataOnAssignment']:
-                metadata = []
-                for item in self.config['setMetadataOnAssignment']:
-                    value = datetime.datetime.now().isoformat() if item['value'] == 'datetime' else item['value']
-                    metadata.append({'key': item['key'], 'value': value})
-                await self.wassenger_client.update_chat_metadata(data, device, metadata)
+        """Assign chat to agent. Not applicable to Telegram, but kept for compatibility."""
+        # Telegram doesn't support agent assignment
+        # Just send a message that human help was requested
+        chat_id = data.get('chat', {}).get('id') or data.get('chat_id')
+        if chat_id:
             await self.send_message({
-                'phone': data['fromNumber'],
+                'chat_id': chat_id,
                 'message': self.config['templateMessages']['chatAssigned'],
-                'device': device['id'],
             })
-        except Exception as e:
-            logging.error(f'Failed to assign chat to agent: {e}')
 
     def filter_eligible_members(self, members):
         eligible = []
@@ -122,7 +91,11 @@ class ChatBot:
         return eligible
 
     async def send_message(self, data):
-        return await self.wassenger_client.send_message(data)
+        """Send message via Telegram. Supports both 'chat_id' and 'phone' for compatibility."""
+        # Convert 'phone' to 'chat_id' if needed for backward compatibility
+        if 'phone' in data and 'chat_id' not in data:
+            data['chat_id'] = data['phone']
+        return await self.telegram_client.send_message(data)
 
     async def process_message(self, data, device):
         try:
@@ -137,10 +110,15 @@ class ChatBot:
             if self.has_chat_metadata_quota_exceeded(chat):
                 logging.info(f'Chat quota previously exceeded: {chat_id}')
                 return
-            memory_store.set(chat_id, memory_store.get(chat_id, 0) + 1)
+            # Use separate key for message count
+            message_count_key = f"msg_count_{chat_id}"
+            current_count = memory_store.get(message_count_key, 0)
+            if not isinstance(current_count, int):
+                current_count = 0
+            memory_store.set(message_count_key, current_count + 1)
             body = await self.extract_message_body(data)
             logging.info(f'Processing inbound message: chatId={chat_id}, type={data.get("type")}, bodyLength={len(body)}')
-            await self.wassenger_client.send_typing_state(data, device)
+            await self.telegram_client.send_typing_state(data, device)
             if re.match(r'^(human|person|help|stop)$', body.strip(), re.I):
                 await self.assign_chat_to_agent(data, device)
                 return
@@ -150,18 +128,29 @@ class ChatBot:
             logging.error(f'Failed to process message: {e}, chatId={data.get("chat", {}).get("id", "unknown")}')
 
     async def extract_message_body(self, data):
+        """Extract message body from Telegram update."""
         body = data.get('body', '')
-        if data.get('type') == 'audio' and data.get('media', {}).get('id'):
+        
+        # Handle Telegram message types
+        msg_type = data.get('type', '')
+        
+        # Handle audio/voice messages
+        if msg_type in ['audio', 'voice'] and data.get('media', {}).get('id'):
             body = await self.transcribe_audio(data)
+        
+        # Handle other media types
         if not body:
-            msg_type = data.get('type')
             body = {
                 'image': 'User sent an image',
+                'photo': 'User sent an image',
                 'video': 'User sent a video',
                 'document': 'User sent a document',
                 'location': 'User sent a location',
-                'contacts': 'User sent contact information',
+                'contact': 'User sent contact information',
+                'voice': 'User sent a voice message',
+                'audio': 'User sent an audio file',
             }.get(msg_type, 'User sent a message')
+        
         max_length = min(self.config['limits']['maxInputCharacters'], 10000)
         return body[:max_length].strip()
 
@@ -170,7 +159,7 @@ class ChatBot:
             media_id = data.get('media', {}).get('id')
             if not media_id:
                 return ''
-            audio_content = await self.wassenger_client.download_media(media_id)
+            audio_content = await self.telegram_client.download_media(media_id)
             if not audio_content:
                 return ''
             temp_dir = self.config['server'].get('tempPath', '.tmp')
@@ -187,10 +176,10 @@ class ChatBot:
 
     async def generate_and_send_response(self, data, device, body, use_audio):
         if not body:
+            chat_id = data.get('chat', {}).get('id') or data.get('chat_id')
             await self.send_message({
-                'phone': data['fromNumber'],
+                'chat_id': chat_id,
                 'message': self.config['unknownCommandMessage'],
-                'device': device['id'],
             })
             return
         chat_id = data['chat']['id']
@@ -215,11 +204,19 @@ class ChatBot:
             await self.send_response(data, device, response, use_audio)
             await self.update_chat_metadata(data, device)
         except Exception as e:
+            error_msg = str(e)
             logging.error(f'Failed to generate response: {e}')
+            chat_id = data.get('chat', {}).get('id') or data.get('chat_id')
+            
+            # Handle rate limiting specifically
+            if '429' in error_msg or 'Too Many Requests' in error_msg:
+                error_message = "I'm receiving too many requests right now. Please try again in a moment."
+            else:
+                error_message = self.config['unknownCommandMessage']
+            
             await self.send_message({
-                'phone': data['fromNumber'],
-                'message': self.config['unknownCommandMessage'],
-                'device': device['id'],
+                'chat_id': chat_id,
+                'message': error_message,
             })
 
     async def generate_response_with_functions(self, messages, tools, data, device):
@@ -279,9 +276,9 @@ class ChatBot:
         memory_store.set(chat_id, messages)
 
     async def send_response(self, data, device, response, use_audio):
+        chat_id = data.get('chat', {}).get('id') or data.get('chat_id')
         message_data = {
-            'phone': data['fromNumber'],
-            'device': device['id'],
+            'chat_id': chat_id,
         }
         if use_audio and self.config['features']['audioOutput']:
             audio_content = await self.openai_client.generate_speech(
@@ -304,19 +301,17 @@ class ChatBot:
         await self.send_message(message_data)
 
     async def update_chat_metadata(self, data, device):
-        try:
-            if self.config['setLabelsOnBotChats']:
-                await self.wassenger_client.update_chat_labels(data, device, self.config['setLabelsOnBotChats'])
-            if self.config['setMetadataOnBotChats']:
-                metadata = []
-                for item in self.config['setMetadataOnBotChats']:
-                    value = datetime.datetime.now().isoformat() if item['value'] == 'datetime' else item['value']
-                    metadata.append({'key': item['key'], 'value': value})
-                await self.wassenger_client.update_chat_metadata(data, device, metadata)
-        except Exception as e:
-            logging.error(f'Failed to update chat metadata: {e}')
+        """Update chat metadata. Not applicable to Telegram, but kept for compatibility."""
+        # Telegram doesn't support chat metadata/labels
+        # This is a no-op for Telegram
+        pass
 
     def get_wassenger_client(self):
-        return self.wassenger_client
+        """Backward compatibility method. Returns Telegram client."""
+        return self.telegram_client
+    
+    def get_telegram_client(self):
+        """Get Telegram client."""
+        return self.telegram_client
 
     # Add more methods as needed

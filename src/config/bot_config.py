@@ -6,40 +6,46 @@ load_dotenv()
 class BotConfig:
     # Default welcome message
     WELCOME_MESSAGE = (
-        'Hey there 👋 Welcome to this ChatGPT-powered AI chatbot demo using *Wassenger API*! I can also speak many languages 😁'
+        'Hey there 👋 Welcome! I\'m your Soccer AI Assistant ⚽\n\n'
+        'I can answer questions about soccer, football, players, teams, leagues, matches, and everything related to the beautiful game! 🏆'
     )
 
     # Default help message
     DEFAULT_MESSAGE = (
-        "Don't be shy 😁 try asking anything to the AI chatbot, using natural language!\n\n"
-        "Example queries:\n\n"
-        "1️⃣ Explain me what is Wassenger\n"
-        "2️⃣ Can I use Wassenger to send automatic messages?\n"
-        "3️⃣ Can I schedule messages using Wassenger?\n"
-        "4️⃣ Is there a free trial available?\n\n"
-        "Type *human* to talk with a person. The chat will be assigned to an available member of the team.\n\n"
-        "Give it a try! 😁"
+        "I'm a Soccer AI Assistant ⚽ I can help you with soccer-related questions!\n\n"
+        "Example questions you can ask:\n\n"
+        "1️⃣ Who won the World Cup 2022?\n"
+        "2️⃣ Tell me about Messi's career\n"
+        "3️⃣ What are the top European leagues?\n"
+        "4️⃣ Explain the offside rule\n"
+        "5️⃣ Who are the best goalkeepers in the world?\n\n"
+        "I only answer questions about soccer/football. For other topics, please ask a human.\n\n"
+        "Type *human* if you need to talk with a person.\n\n"
+        "Ask me anything about soccer! ⚽"
     )
 
     # Unknown command message
     UNKNOWN_COMMAND_MESSAGE = (
-        "I'm sorry, I was unable to understand your message. Can you please elaborate more?\n\n"
-        "If you would like to chat with a human, just reply with *human*."
+        "I'm sorry, I couldn't understand your question. Could you please rephrase it?\n\n"
+        "Remember, I only answer questions about soccer/football. If you have questions about other topics, please type *human* to talk with a person."
     )
 
     # AI bot instructions
     BOT_INSTRUCTIONS = (
-        "You are a smart virtual customer support assistant who works for Wassenger.\n"
-        "You can identify yourself as Milo, the Wassenger AI Assistant.\n"
-        "You will be chatting with random customers who may contact you with general queries about the product.\n"
-        "Wassenger is a cloud solution that offers WhatsApp API and multi-user live communication services designed for businesses and developers.\n"
-        "Wassenger also enables customers to automate WhatsApp communication and build chatbots.\n"
-        "You are an expert customer support agent.\n"
-        "Be polite. Be helpful. Be emphatic. Be concise.\n"
-        "Politely reject any queries that are not related to customer support tasks or Wassenger services itself.\n"
-        "Stick strictly to your role as a customer support virtual assistant for Wassenger.\n"
-        "Always speak in the language the user prefers or uses.\n"
-        "If you can't help with something, ask the user to type *human* in order to talk with customer support.\n"
+        "You are a Soccer AI Assistant specialized in answering questions about soccer (also known as football).\n"
+        "You are knowledgeable, friendly, and passionate about the beautiful game.\n"
+        "Always speak in the language the user prefers or uses.\n\n"
+        "IMPORTANT RULES:\n"
+        "- You ONLY answer questions about soccer/football, including:\n"
+        "  * Players, teams, leagues, and competitions\n"
+        "  * Match results, statistics, and history\n"
+        "  * Rules, tactics, and strategies\n"
+        "  * Transfers, news, and current events in soccer\n"
+        "  * World Cups, Champions League, and other tournaments\n"
+        "  * Soccer culture, stadiums, and fan culture\n\n"
+        "- You MUST politely decline and redirect questions that are NOT about soccer.\n"
+        "- When declining non-soccer questions, say: 'I'm a Soccer AI Assistant and I only answer questions about soccer/football. If you need help with other topics, please type *human* to talk with a person.'\n\n"
+        "Be accurate, helpful, and enthusiastic about soccer. Provide detailed and interesting answers.\n"
         "Do not use Markdown formatted and rich text, only raw text."
     )
 
@@ -110,11 +116,9 @@ class BotConfig:
     @staticmethod
     def get_api_config():
         return {
-            'apiKey': BotConfig.env('API_KEY', 'ENTER API KEY HERE'),
+            'telegramBotToken': BotConfig.env('TELEGRAM_BOT_TOKEN', ''),
             'openaiKey': BotConfig.env('OPENAI_API_KEY', ''),
             'openaiModel': BotConfig.env('OPENAI_MODEL', 'gpt-4o'),
-            'apiBaseUrl': BotConfig.env('API_URL', 'https://api.wassenger.com/v1'),
-            'device': BotConfig.env('DEVICE', 'ENTER WHATSAPP DEVICE ID'),
         }
 
     @staticmethod
@@ -128,10 +132,6 @@ class BotConfig:
             port = 8080
         return {
             'port': port,
-            'webhookUrl': BotConfig.env('WEBHOOK_URL'),
-            'ngrokToken': BotConfig.env('NGROK_TOKEN', ''),
-            'ngrokPath': BotConfig.env('NGROK_PATH'),
-            'production': BotConfig.env('NODE_ENV') == 'production',
             'tempPath': '.tmp',
         }
 

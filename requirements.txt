@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 python-dotenv
 httpx
-pyngrok
 cachetools
 openai
 Pillow
+python-telegram-bot

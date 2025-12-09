@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-WhatsApp ChatGPT Bot Startup Script
+Telegram ChatGPT Bot Startup Script
 
-This script provides an easy way to start the ChatGPT WhatsApp bot with proper
+This script provides an easy way to start the ChatGPT Telegram bot with proper
 initialization and error handling.
 
 Usage:
@@ -29,7 +29,7 @@ from src.utils.app_logger import AppLogger
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="WhatsApp ChatGPT Bot",
+        description="Telegram ChatGPT Bot",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
@@ -37,7 +37,7 @@ def parse_arguments():
     parser.add_argument(
         '--dev',
         action='store_true',
-        help='Start in development mode with ngrok tunnel'
+        help='Start in development mode'
     )
 
     parser.add_argument(
@@ -76,13 +76,10 @@ async def validate_config_only():
         server_config = config['server']
 
         print("\n📋 Configuration Summary:")
-        print(f"  • API Key: {'✅ Set' if api_config.get('apiKey') and len(api_config['apiKey']) > 60 else '❌ Missing or invalid'}")
+        print(f"  • Telegram Bot Token: {'✅ Set' if api_config.get('telegramBotToken') else '❌ Missing'}")
         print(f"  • OpenAI Key: {'✅ Set' if api_config.get('openaiKey') and len(api_config['openaiKey']) > 45 else '❌ Missing or invalid'}")
         print(f"  • OpenAI Model: {api_config.get('openaiModel', 'Not set')}")
         print(f"  • Server Port: {server_config.get('port', 'Not set')}")
-        print(f"  • Production Mode: {'Yes' if server_config.get('production') else 'No'}")
-        print(f"  • Webhook URL: {server_config.get('webhookUrl', 'Not set (will use ngrok)')}")
-        print(f"  • Ngrok Token: {'✅ Set' if server_config.get('ngrokToken') else '❌ Not set'}")
 
     except Exception as e:
         AppLogger.error('Configuration validation failed', {'error': str(e)})
